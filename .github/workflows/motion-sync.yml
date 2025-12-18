@@ -1,0 +1,39 @@
+name: Motion-Craft Sync Agent
+
+on:
+  # Active hours: Every 15 minutes from 6 AM - 11 PM GMT+7 (23:00-16:00 UTC)
+  schedule:
+    - cron: '0,15,30,45 23 * * *'      # 6:00-6:45 AM GMT+7
+    - cron: '0,15,30,45 0-16 * * *'    # 7:00 AM - 11:45 PM GMT+7
+
+  # Off hours: Every 2 hours from 11 PM - 6 AM GMT+7 (16:00-22:00 UTC)
+  # (Note: 16:00 covered by active schedule, so start at 18:00)
+    - cron: '0 18,20,22 * * *'         # Off-hours sync
+
+  # Allow manual trigger for testing
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Install Craft CLI
+        run: curl -fsSL https://agents.craft.do/install.sh | bash
+
+      - name: Run Motion Sync Agent
+        timeout-minutes: 10
+        env:
+          CRAFT_ANTHROPIC_API_KEY: ${{ secrets.CRAFT_ANTHROPIC_API_KEY }}
+          MOTION_API_KEY: ${{ secrets.MOTION_API_KEY }}
+        run: |
+          craft \
+            -w "${{ secrets.CRAFT_MCP_URL }}" \
+            -p "Run the Motion Sync Agent workflow. Execute the full bidirectional sync between Craft and Motion as documented in the Motion Sync Agent document (ID: 1723). This is an automated scheduled run." \
+            --output-format stream-json \
+            -m claude-sonnet-4-20250514
+
+      - name: Show debug log if failed
+        if: failure()
+        run: cat /tmp/craft-debug.log || echo "No debug log found"
