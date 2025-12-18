@@ -1,6 +1,6 @@
 # Motion-Craft Sync Agent
 
-Automated bidirectional sync agent between Motion (task management) and Craft Documents using GitHub Actions.
+Automated bidirectional sync agent between Motion (task management) and Craft Documents, running on Railway with scheduled cron jobs.
 
 ## Features
 
@@ -16,130 +16,98 @@ Automated bidirectional sync agent between Motion (task management) and Craft Do
 
 ## How It Works
 
-This agent runs as a **Craft Agent workflow** triggered by **GitHub Actions** on a schedule. The workflow:
+This agent runs on **Railway** using a Docker container with:
 
-1. Installs Craft CLI in GitHub Actions runner
-2. Connects to your Craft workspace via MCP
-3. Executes the Motion Sync Agent (document ID: 1723)
-4. Agent has full access to Craft MCP tools and Motion API
-5. Posts results to Craft Notifications collection
+1. **Ubuntu base** with Craft CLI installed
+2. **Cron daemon** that runs on schedule
+3. **Craft Agent execution** with full MCP tool access
+4. **Motion API integration** for bidirectional sync
+5. **Results posted** to Craft Notifications collection
 
-## Deployment
+## Railway Deployment
 
 ### Prerequisites
 
-1. **GitHub repository** (already created: `benhall19-afk/CraftAgent-MotionSync`)
-2. **Craft workspace** with Motion Sync Agent configured
+1. **Railway account** (https://railway.app)
+2. **GitHub repository** (already at: `benhall19-afk/CraftAgent-MotionSync`)
 3. **Anthropic API key** for Claude
-4. **Motion API key**: `ScjduIb1fn8jvOVptMJGEa76E+THmWN4tnETFQFSLjc=`
+4. **Craft MCP URL** for your workspace
+5. **Motion API key**: `ScjduIb1fn8jvOVptMJGEa76E+THmWN4tnETFQFSLjc=`
 
 ### Setup Instructions
 
-#### Step 1: Add GitHub Secrets
+#### Step 1: Create Railway Project
 
-Go to your repository → **Settings** → **Secrets and variables** → **Actions**
+1. Go to **Railway**: https://railway.app
+2. Click **"New Project"**
+3. Select **"Deploy from GitHub repo"**
+4. Choose: **benhall19-afk/CraftAgent-MotionSync**
 
-Add these secrets:
+#### Step 2: Add Environment Variables
 
-1. **CRAFT_ANTHROPIC_API_KEY**
-   - Your Anthropic API key
-   - Get from: https://console.anthropic.com/
+In Railway dashboard → your project → **Variables** tab, add:
 
-2. **CRAFT_MCP_URL**
-   - Your Craft workspace MCP URL
-   - Format: `craft://<workspace-id>`
-   - Find in Craft Agents setup
-
-3. **MOTION_API_KEY**
-   - Value: `ScjduIb1fn8jvOVptMJGEa76E+THmWN4tnETFQFSLjc=`
-
-#### Step 2: Push Workflow to GitHub
-
-The workflow file is already in `.github/workflows/motion-sync.yml`
-
-```bash
-cd /Users/benhpro/motion-craft-sync
-git add .github/workflows/motion-sync.yml
-git commit -m "Add GitHub Actions workflow for scheduled sync"
-git push origin main
+```
+CRAFT_ANTHROPIC_API_KEY=<your-anthropic-api-key>
+CRAFT_MCP_URL=craft://<your-workspace-id>
+MOTION_API_KEY=ScjduIb1fn8jvOVptMJGEa76E+THmWN4tnETFQFSLjc=
+TZ=Asia/Bangkok
 ```
 
-#### Step 3: Enable Actions
+**How to get CRAFT_MCP_URL:**
+- Format: `craft://<workspace-id>`
+- Find your workspace ID in Craft settings or from the Craft Agents setup
 
-1. Go to your repository on GitHub
-2. Click **Actions** tab
-3. If prompted, enable GitHub Actions for this repository
+#### Step 3: Deploy
 
-#### Step 4: Test Manual Run
+Railway will automatically:
+- Detect the `Dockerfile`
+- Build the Docker image
+- Start the container with cron daemon
+- Begin running syncs on schedule
 
-1. Go to **Actions** tab
-2. Select **Motion-Craft Sync Agent** workflow
-3. Click **Run workflow** → **Run workflow**
-4. Watch the logs to verify it works
+#### Step 4: Monitor
 
-### Schedule
+Check Railway logs to see:
+- Cron job executions
+- Sync run outputs
+- Any errors
 
-The workflow runs automatically:
+Also check your Craft **Notifications** collection (ID: 2041) for sync summaries!
 
-- **Every 15 minutes**: 6:00 AM - 11:45 PM GMT+7 (active hours)
-- **Every 2 hours**: 11:00 PM - 6:00 AM GMT+7 (off-hours)
+## Schedule
 
-GitHub Actions uses UTC time. The cron expressions are pre-configured for GMT+7 (Bangkok timezone).
+The cron jobs run on **Asia/Bangkok (GMT+7)** timezone:
 
-## Monitoring
+### Active Hours (6 AM - 11 PM)
+Runs every 15 minutes:
+```
+0,15,30,45 6-23 * * *
+```
 
-### Check Sync Status
-
-1. **Craft Notifications Collection** (ID: 2041)
-   - View sync run summaries
-   - See tasks created/updated counts
-   - Check for errors
-
-2. **GitHub Actions Logs**
-   - Go to repository → Actions tab
-   - Click on any workflow run
-   - View detailed execution logs
-
-3. **Sync Status Log Collection** (ID: 1942)
-   - Detailed sync history in Craft
-   - Full statistics per run
-
-## Valid Labels (Areas of Life)
-
-Tasks in Motion "My Private Workspace" sync to Craft based on these labels (must match exactly):
-
-- ✍️ Learning the Thai Language
-- 🏠 Rental Houses
-- 💰️ Finances
-- 📖 Bible and Prayer
-- 📝 Blog Writing
-- 🧘‍♂️ Health and Fitness
-- 🎙️ Podcasting
-- 👨‍👩‍👦 My Family
-
-## Cost
-
-GitHub Actions is **free** for public repositories with generous limits:
-
-- 2,000 minutes/month free for private repos
-- Each sync run takes ~1-2 minutes
-- ~45 runs per day = ~1,350 minutes/month
-- **Total cost: $0** (well within free tier)
+### Off Hours (11 PM - 6 AM)
+Runs every 2 hours:
+```
+0 0,2,4 * * *
+```
 
 ## Architecture
 
 ```
 ┌─────────────────┐
-│ GitHub Actions  │
-│ (Scheduled)     │
-└────────┬────────┘
-         │ Triggers every 15 min
-         │
-         ▼
-┌─────────────────┐
-│  Craft CLI      │
-│  Installs       │
-└────────┬────────┘
+│ Railway Docker  │
+│ Container       │
+│                 │
+│  ┌───────────┐  │
+│  │   Cron    │  │
+│  │  Daemon   │  │
+│  └─────┬─────┘  │
+│        │        │
+│        ▼        │
+│  ┌───────────┐  │
+│  │ Craft CLI │  │
+│  └─────┬─────┘  │
+└────────┼────────┘
          │
          ▼
 ┌─────────────────┐         ┌──────────────────┐
@@ -158,52 +126,108 @@ GitHub Actions is **free** for public repositories with generous limits:
 └─────────────────┘
 ```
 
+## Cost Estimate
+
+Railway Hobby Plan:
+- **Base**: $5/month
+- **Container usage**: ~$2-3/month (lightweight, minimal CPU)
+- **Total**: ~$7-8/month
+
+## Monitoring
+
+### Check Sync Status
+
+1. **Railway Logs**
+   - Go to Railway dashboard → your service
+   - View **Deployments** → **Logs**
+   - See cron executions and sync outputs
+
+2. **Craft Notifications** (Collection ID: 2041)
+   - View sync run summaries
+   - See tasks created/updated counts
+   - Check for errors
+
+3. **Sync Status Log** (Collection ID: 1942)
+   - Detailed sync history
+   - Full statistics per run
+
+## Valid Labels (Areas of Life)
+
+Tasks in Motion "My Private Workspace" sync to Craft based on these labels (must match exactly):
+
+- ✍️ Learning the Thai Language
+- 🏠 Rental Houses
+- 💰️ Finances
+- 📖 Bible and Prayer
+- 📝 Blog Writing
+- 🧘‍♂️ Health and Fitness
+- 🎙️ Podcasting
+- 👨‍👩‍👦 My Family
+
+## Files
+
+- **Dockerfile** - Container definition with Ubuntu, Craft CLI, and cron
+- **sync-cron.sh** - Script that executes the Craft Agent
+- **crontab** - Cron schedule configuration
+- **railway.json** - Railway deployment configuration
+- **.github/workflows/motion-sync.yml** - Alternative GitHub Actions option
+
 ## Troubleshooting
 
-### Workflow fails with "Craft CLI not found"
-- Check the install step completed successfully
-- Verify the curl command ran without errors
+### Container keeps restarting
+- Check Railway logs for errors
+- Verify environment variables are set correctly
+- Ensure CRAFT_MCP_URL format is correct: `craft://<workspace-id>`
+
+### Cron not running
+- Check if cron daemon started: Look for "Starting Motion-Craft sync..." in logs
+- Verify timezone is set correctly (should be Asia/Bangkok)
+- Check crontab syntax
 
 ### "Unauthorized" or MCP connection errors
-- Verify `CRAFT_MCP_URL` is correct in GitHub Secrets
+- Verify `CRAFT_MCP_URL` is correct
 - Check `CRAFT_ANTHROPIC_API_KEY` is valid
-- Ensure MCP URL format: `craft://<workspace-id>`
+- Ensure workspace ID is correct in MCP URL
 
 ### Tasks not syncing
-- Check Motion API key is valid in GitHub Secrets
-- Review Craft Notifications collection for error details
-- Check GitHub Actions logs for detailed error messages
+- Check Motion API key in Railway variables
+- Review Craft Notifications collection for errors
+- Check Railway logs for detailed error messages
 
 ### Labels not applying
-- Ensure labels exist in Motion workspace first
-- Check task is in a valid Areas of Life document
+- Ensure labels exist in Motion workspace
+- Check task is in valid Areas of Life document
 - Verify document name matches label exactly (including emojis)
 
-## Manual Execution
+## Manual Sync Trigger
 
-To run the sync manually without waiting for the schedule:
+To trigger a sync manually, you can:
 
-1. Go to GitHub repository → **Actions** tab
-2. Select **Motion-Craft Sync Agent** workflow
-3. Click **Run workflow**
-4. Select branch: **main**
-5. Click **Run workflow**
+1. **Restart Railway service** (forces immediate cron execution)
+2. **Run locally** with Craft CLI:
+   ```bash
+   craft -w "craft://<workspace-id>" \
+     -p "Run the Motion Sync Agent workflow" \
+     -m claude-sonnet-4-20250514
+   ```
 
-Or use Craft Agents CLI locally:
+## Alternative: GitHub Actions
 
-```bash
-craft -w "craft://<workspace-id>" \
-  -p "Run the Motion Sync Agent workflow" \
-  -m claude-sonnet-4-20250514
-```
+This repository also includes a GitHub Actions workflow (`.github/workflows/motion-sync.yml`) as an alternative to Railway. GitHub Actions is free but requires your computer or a server to be the MCP host.
+
+Railway is recommended for true 24/7 cloud execution.
 
 ## Support
 
 For issues or questions:
-- Check Craft Notifications collection (ID: 2041)
-- Review GitHub Actions logs
-- Verify all GitHub Secrets are configured
+- Check Railway logs for deployment/execution errors
+- Review Craft Notifications collection (ID: 2041)
+- Verify all environment variables are configured
 - Check Motion Sync Agent document (ID: 1723) for configuration
+
+## Repository
+
+https://github.com/benhall19-afk/CraftAgent-MotionSync
 
 ## License
 

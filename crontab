@@ -1,0 +1,8 @@
+# Motion-Craft Sync Agent Cron Jobs
+# Times are in Asia/Bangkok timezone (GMT+7)
+
+# Active hours: Every 15 minutes from 6 AM - 11 PM
+0,15,30,45 6-23 * * * /usr/local/bin/sync-cron.sh
+
+# Off hours: Every 2 hours from 11 PM - 6 AM
+0 0,2,4 * * * /usr/local/bin/sync-cron.sh
