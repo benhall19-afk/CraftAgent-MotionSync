@@ -1,0 +1,25 @@
+{
+  "name": "motion-craft-sync-agent",
+  "version": "1.0.0",
+  "description": "Automated sync agent between Motion and Craft Documents",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "node index.js"
+  },
+  "keywords": [
+    "motion",
+    "craft",
+    "sync",
+    "automation"
+  ],
+  "author": "Ben Henderson",
+  "license": "MIT",
+  "dependencies": {
+    "node-cron": "^3.0.3",
+    "node-fetch": "^2.7.0"
+  },
+  "engines": {
+    "node": ">=18.x"
+  }
+}
