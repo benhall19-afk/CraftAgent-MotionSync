@@ -26,5 +26,11 @@ RUN crontab /etc/cron.d/motion-sync
 # Create log file
 RUN touch /var/log/cron.log
 
-# Start cron in foreground
-CMD cron && tail -f /var/log/cron.log
+# Create startup script that exports env vars to cron
+RUN echo '#!/bin/bash\n\
+printenv | grep -v "no_proxy" >> /etc/environment\n\
+cron\n\
+tail -f /var/log/cron.log' > /start.sh && chmod +x /start.sh
+
+# Start with env vars exported
+CMD ["/start.sh"]
