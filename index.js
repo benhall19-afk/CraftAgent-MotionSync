@@ -3,7 +3,8 @@ const fetch = require('node-fetch');
 
 // Environment variables from Railway
 const MOTION_API_KEY = process.env.MOTION_API_KEY;
-const CRAFT_MCP_ENDPOINT = process.env.CRAFT_MCP_ENDPOINT || 'http://localhost:3000';
+const CRAFT_API_TOKEN = process.env.CRAFT_API_TOKEN;
+const CRAFT_SPACE_ID = process.env.CRAFT_SPACE_ID;
 
 // Motion API Configuration
 const MOTION_API_BASE = 'https://api.usemotion.com/v1';
@@ -41,22 +42,30 @@ function getNowBangkok() {
   return now.toLocaleString('en-US', { timeZone: 'Asia/Bangkok' });
 }
 
-// Craft MCP Helper - Call Craft MCP tools via HTTP
-async function callCraftMCP(tool, params) {
+// Craft API Configuration
+const CRAFT_API_BASE = 'https://api.craft.do/v1';
+const CRAFT_HEADERS = {
+  'Authorization': `Bearer ${CRAFT_API_TOKEN}`,
+  'Content-Type': 'application/json'
+};
+
+// Craft API Helper - Call Craft REST API
+async function callCraftAPI(endpoint, options = {}) {
   try {
-    const response = await fetch(`${CRAFT_MCP_ENDPOINT}/mcp`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tool, params })
+    const url = `${CRAFT_API_BASE}${endpoint}`;
+    const response = await fetch(url, {
+      ...options,
+      headers: { ...CRAFT_HEADERS, ...options.headers }
     });
 
     if (!response.ok) {
-      throw new Error(`Craft MCP error: ${response.statusText}`);
+      const errorText = await response.text();
+      throw new Error(`Craft API error: ${response.status} ${errorText}`);
     }
 
     return await response.json();
   } catch (error) {
-    console.error(`Craft MCP call failed for ${tool}:`, error);
+    console.error(`Craft API call failed for ${endpoint}:`, error);
     throw error;
   }
 }
@@ -85,10 +94,7 @@ async function callMotionAPI(endpoint, options = {}) {
 // Load all mappings from Craft collection
 async function loadMappings() {
   console.log('Loading sync mappings from Craft...');
-  const result = await callCraftMCP('mcp__craft__collectionItems_get', {
-    collectionBlockId: '1619',
-    _intent: 'Loading all Craft-Motion sync mappings'
-  });
+  const result = await callCraftAPI(`/spaces/${CRAFT_SPACE_ID}/collections/1619/items`);
 
   const taskMappings = result.items.filter(item =>
     item.properties.type === 'task'
@@ -111,26 +117,20 @@ async function getMotionTasks(workspaceId) {
 
 // Get all Craft tasks for a scope
 async function getCraftTasks(scope, documentId = null) {
-  const params = {
-    scope,
-    _intent: `Getting Craft tasks from ${scope}`
-  };
+  let endpoint = `/spaces/${CRAFT_SPACE_ID}/tasks?scope=${scope}`;
 
   if (documentId) {
-    params.documentId = documentId;
+    endpoint += `&documentId=${documentId}`;
   }
 
-  const result = await callCraftMCP('mcp__craft__tasks_get', params);
+  const result = await callCraftAPI(endpoint);
   return result.tasks || [];
 }
 
 // Get document info for a task to determine label
 async function getTaskDocument(taskId) {
   try {
-    const result = await callCraftMCP('mcp__craft__blocks_get', {
-      id: taskId,
-      _intent: 'Getting task location to determine label'
-    });
+    const result = await callCraftAPI(`/spaces/${CRAFT_SPACE_ID}/blocks/${taskId}`);
 
     // Check if task is in a document within Areas of Life
     const location = result.location || {};
@@ -194,11 +194,13 @@ async function createCraftTask(task, location) {
         scheduleDate: task.startOn || today,
         deadlineDate: task.dueDate
       }
-    }],
-    _intent: 'Creating task synced from Motion'
+    }]
   };
 
-  const result = await callCraftMCP('mcp__craft__tasks_add', payload);
+  const result = await callCraftAPI(`/spaces/${CRAFT_SPACE_ID}/tasks`, {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
   return result.tasks[0];
 }
 
@@ -219,11 +221,13 @@ async function updateCraftTask(taskId, updates) {
     tasksToUpdate: [{
       id: taskId,
       ...updates
-    }],
-    _intent: 'Updating task from Motion sync'
+    }]
   };
 
-  return await callCraftMCP('mcp__craft__tasks_update', payload);
+  return await callCraftAPI(`/spaces/${CRAFT_SPACE_ID}/tasks`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload)
+  });
 }
 
 // Create task mapping in Craft collection
@@ -231,7 +235,6 @@ async function createTaskMapping(craftId, motionId, taskName, workspace, startDa
   const today = getTodayBangkok();
 
   const payload = {
-    collectionBlockId: '1619',
     items: [{
       entity_name: taskName,
       properties: {
@@ -244,11 +247,13 @@ async function createTaskMapping(craftId, motionId, taskName, workspace, startDa
         last_synced: today,
         status: 'synced'
       }
-    }],
-    _intent: 'Creating new task mapping'
+    }]
   };
 
-  return await callCraftMCP('mcp__craft__collectionItems_add', payload);
+  return await callCraftAPI(`/spaces/${CRAFT_SPACE_ID}/collections/1619/items`, {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
 }
 
 // Post notification to Craft
@@ -260,7 +265,6 @@ async function postNotification(message, type, details) {
   });
 
   const payload = {
-    collectionBlockId: '2041',
     items: [{
       notification: message,
       properties: {
@@ -273,11 +277,13 @@ async function postNotification(message, type, details) {
         conflicts: details.conflicts || 0,
         notes: details.notes || ''
       }
-    }],
-    _intent: 'Posting sync notification'
+    }]
   };
 
-  return await callCraftMCP('mcp__craft__collectionItems_add', payload);
+  return await callCraftAPI(`/spaces/${CRAFT_SPACE_ID}/collections/2041/items`, {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
 }
 
 // Main sync function

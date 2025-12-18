@@ -37,8 +37,9 @@ Tasks in Motion "My Private Workspace" sync to Craft Inbox. When tasks are moved
 ### Prerequisites
 
 1. **Motion API Key**: Already have: `ScjduIb1fn8jvOVptMJGEa76E+THmWN4tnETFQFSLjc=`
-2. **Craft MCP Endpoint**: You'll need to set up a Craft MCP server endpoint (or use Railway's internal networking)
-3. **GitHub Account**: To deploy via GitHub integration
+2. **Craft API Token**: Get from Craft Settings → API Access
+3. **Craft Space ID**: Your Craft workspace ID
+4. **GitHub Account**: To deploy via GitHub integration
 
 ### Step 1: Push to GitHub
 
@@ -69,23 +70,19 @@ git push -u origin main
 4. **Add Environment Variables**:
    ```
    MOTION_API_KEY=ScjduIb1fn8jvOVptMJGEa76E+THmWN4tnETFQFSLjc=
-   CRAFT_MCP_ENDPOINT=<your-craft-mcp-endpoint>
+   CRAFT_API_TOKEN=<your-craft-api-token>
+   CRAFT_SPACE_ID=<your-craft-space-id>
    TZ=Asia/Bangkok
    NODE_ENV=production
    ```
 5. **Deploy**: Railway will automatically detect `package.json` and deploy
 
-### Step 3: Configure Craft MCP Endpoint
+### Step 3: Get Craft API Credentials
 
-You have two options:
-
-**Option A: Deploy Craft MCP Server on Railway** (Recommended)
-- Create a second Railway service for Craft MCP server
-- Set `CRAFT_MCP_ENDPOINT` to the Railway internal URL (e.g., `http://craft-mcp.railway.internal:3000`)
-
-**Option B: Use Public Craft MCP Server**
-- If you have a publicly accessible Craft MCP server, use its URL
-- Set `CRAFT_MCP_ENDPOINT=https://your-craft-mcp-server.com`
+1. **Open Craft** → **Settings** → **API Access**
+2. **Create new API token** (if you don't have one)
+3. **Copy the token** - this is your `CRAFT_API_TOKEN`
+4. **Find your Space ID**: Check the URL when viewing your space (e.g., `craft.do/s/abc123` → Space ID is `abc123`)
 
 ### Step 4: Monitor
 
@@ -104,7 +101,8 @@ npm install
 
 # Set environment variables
 export MOTION_API_KEY="ScjduIb1fn8jvOVptMJGEa76E+THmWN4tnETFQFSLjc="
-export CRAFT_MCP_ENDPOINT="http://localhost:3000"
+export CRAFT_API_TOKEN="your_craft_api_token"
+export CRAFT_SPACE_ID="your_space_id"
 export TZ="Asia/Bangkok"
 
 # Run
@@ -159,9 +157,10 @@ The agent uses three Craft collections for coordination:
 
 ## Troubleshooting
 
-### Logs show "Craft MCP error"
-- Check `CRAFT_MCP_ENDPOINT` is correct
-- Verify Craft MCP server is running and accessible
+### Logs show "Craft API error"
+- Check `CRAFT_API_TOKEN` is valid
+- Verify `CRAFT_SPACE_ID` is correct
+- Ensure API token has proper permissions
 
 ### Tasks not syncing
 - Check Motion API key is valid
@@ -178,7 +177,7 @@ The agent uses three Craft collections for coordination:
 For issues or questions:
 - Check Craft Notifications collection (ID: 2041)
 - Review Railway logs
-- Verify Motion API key and Craft MCP endpoint
+- Verify Motion API key and Craft API credentials
 
 ## License
 
